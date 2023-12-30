@@ -22,7 +22,6 @@ namespace Params {
         POLARITY_FLIP,
         HPF_FREQ,
         HPF_SLOPE,
-        HPF_RESONANCE,
         HPF_BYPASS,
         LOW_SHELF_FREQ,
         LOW_SHELF_GAIN,
@@ -32,6 +31,10 @@ namespace Params {
         LOW_MID_GAIN,
         LOW_MID_Q,
         LOW_MID_BYPASS,
+        MID_FREQ,
+        MID_GAIN,
+        MID_Q,
+        MID_BYPASS,
         HIGH_MID_FREQ,
         HIGH_MID_GAIN,
         HIGH_MID_Q,
@@ -42,7 +45,6 @@ namespace Params {
         HIGH_SHELF_BYPASS,
         LPF_FREQ,
         LPF_SLOPE,
-        LPF_RESONANCE,
         LPF_BYPASS,
     };
 
@@ -52,7 +54,7 @@ namespace Params {
         {Parameters::POLARITY_FLIP, "Polarity"},
         {Parameters::HPF_FREQ, "HPF Freq"},
         {Parameters::HPF_SLOPE, "HPF Slope"},
-        {Parameters::HPF_RESONANCE, "HPF Resonance"},
+        {Parameters::HPF_BYPASS, "HPF Bypass"},
         {Parameters::LOW_SHELF_FREQ, "Low Shelf Freq"},
         {Parameters::LOW_SHELF_GAIN, "Low Shelf Gain"},
         {Parameters::LOW_SHELF_Q, "Low Shelf Q"},
@@ -61,6 +63,10 @@ namespace Params {
         {Parameters::LOW_MID_GAIN, "Low-Mid Gain"},
         {Parameters::LOW_MID_Q, "Low-Mid Q"},
         {Parameters::LOW_MID_BYPASS, "Low-Mid Bypass"},
+        {Parameters::MID_FREQ, "Mid Freq"},
+        {Parameters::MID_GAIN, "Mid Gain"},
+        {Parameters::MID_Q, "Mid Q"},
+        {Parameters::MID_BYPASS, "Mid Bypass"},
         {Parameters::HIGH_MID_FREQ, "High-Mid Freq"},
         {Parameters::HIGH_MID_GAIN, "High-Mid Gain"},
         {Parameters::HIGH_MID_Q, "High-Mid Q"},
@@ -71,7 +77,7 @@ namespace Params {
         {Parameters::HIGH_SHELF_BYPASS, "High Shelf Bypass"},
         {Parameters::LPF_FREQ, "LPF Freq"},
         {Parameters::LPF_SLOPE, "LPF Slope"},
-        {Parameters::LPF_RESONANCE, "LPF Resonance"},
+        {Parameters::LPF_BYPASS, "LPF Bypass"},
     };
 }
 
@@ -122,7 +128,7 @@ public:
 
     enum Filters
     {
-        HPF, LF, LMF, HMF, HF, LPF,
+        HPF, LF, LMF, MF, HMF, HF, LPF,
     };
 
 private:
@@ -133,7 +139,7 @@ private:
     using Filter = juce::dsp::IIR::Filter<float>;
     //Filter hpf, lf, lmf, mf, hmf, hf, lpf;
     using CutFilter = juce::dsp::ProcessorChain<Filter, Filter, Filter>;
-    using MonoChain = juce::dsp::ProcessorChain<CutFilter, Filter, Filter, Filter, Filter, CutFilter>;
+    using MonoChain = juce::dsp::ProcessorChain<CutFilter, Filter, Filter, Filter, Filter, Filter, CutFilter>;
     MonoChain m_LeftChain, m_RightChain;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NewProjectAudioProcessor)
