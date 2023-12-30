@@ -82,15 +82,15 @@ namespace Params {
 }
 
 
-class NewProjectAudioProcessor  : public juce::AudioProcessor
+class EqPTAudioProcessor  : public juce::AudioProcessor
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
 {
 public:
     //==============================================================================
-    NewProjectAudioProcessor();
-    ~NewProjectAudioProcessor() override;
+    EqPTAudioProcessor();
+    ~EqPTAudioProcessor() override;
 
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -141,6 +141,9 @@ private:
     using CutFilter = juce::dsp::ProcessorChain<Filter, Filter, Filter>;
     using MonoChain = juce::dsp::ProcessorChain<CutFilter, Filter, Filter, Filter, Filter, Filter, CutFilter>;
     MonoChain m_LeftChain, m_RightChain;
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NewProjectAudioProcessor)
+    void updateFilters();
+    void updateCutFilter(CutFilter& filter, bool isHPF);
+    void updatePeakFilter(Filter& filter, int filterNo);
+    void updateShelfFilters();
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (EqPTAudioProcessor)
 };

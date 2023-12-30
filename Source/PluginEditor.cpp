@@ -10,7 +10,7 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-NewProjectAudioProcessorEditor::NewProjectAudioProcessorEditor (NewProjectAudioProcessor& p)
+NewProjectAudioProcessorEditor::NewProjectAudioProcessorEditor (EqPTAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     // Make sure that before the constructor has finished, you've set the

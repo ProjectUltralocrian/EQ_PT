@@ -17,7 +17,7 @@
 class NewProjectAudioProcessorEditor  : public juce::AudioProcessorEditor
 {
 public:
-    NewProjectAudioProcessorEditor (NewProjectAudioProcessor&);
+    NewProjectAudioProcessorEditor (EqPTAudioProcessor&);
     ~NewProjectAudioProcessorEditor() override;
 
     //==============================================================================
@@ -26,7 +26,7 @@ public:
 
 
 private:
-    NewProjectAudioProcessor& audioProcessor;
+    EqPTAudioProcessor& audioProcessor;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NewProjectAudioProcessorEditor)
 };
