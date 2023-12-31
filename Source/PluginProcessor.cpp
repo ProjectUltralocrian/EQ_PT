@@ -23,12 +23,47 @@ EqPTAudioProcessor::EqPTAudioProcessor()
                      #endif
                        ), 
         m_TreeState{*this, nullptr, "PARAMS", createLayout()}
+
 #endif
 {
+    
+    using namespace Params;
+    using params = Params::Parameters;
+   
+    for (int i = static_cast<int>(params::HPF_FREQ); i <= static_cast<int>(params::HPF_BYPASS); i++) {
+
+		m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_LeftChain.get<HPF>());
+		m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_RightChain.get<HPF>());
+    }
+    for (int i = static_cast<int>(params::LPF_FREQ); i <= static_cast<int>(params::LPF_BYPASS); i++) {
+
+		m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_LeftChain.get<LPF>());
+		m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_RightChain.get<LPF>());
+    }
+    m_LeftChain.get<HPF>().isHPF = true;
+    m_RightChain.get<HPF>().isHPF = true;
+    m_LeftChain.get<LPF>().isHPF = false;
+    m_RightChain.get<LPF>().isHPF = false;
+    m_LeftChain.get<HPF>().freq = 20.f;
+    m_RightChain.get<HPF>().freq = 20.f;
+    m_LeftChain.get<LPF>().freq = 20000.f;
+    m_RightChain.get<LPF>().freq = 20000.f;
 }
 
 EqPTAudioProcessor::~EqPTAudioProcessor()
 {
+    using namespace Params;
+    using params = Params::Parameters;
+    for (int i = static_cast<int>(params::HPF_FREQ); i <= static_cast<int>(params::HPF_BYPASS); i++) {
+
+		m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_LeftChain.get<HPF>());
+		m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_RightChain.get<HPF>());
+    }
+    for (int i = static_cast<int>(params::LPF_FREQ); i <= static_cast<int>(params::LPF_BYPASS); i++) {
+
+        m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_LeftChain.get<LPF>());
+        m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_RightChain.get<LPF>());
+    }
 }
 
 //==============================================================================
@@ -181,15 +216,16 @@ juce::AudioProcessorEditor* EqPTAudioProcessor::createEditor()
 //==============================================================================
 void EqPTAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    juce::MemoryOutputStream mos(destData, true);
+    m_TreeState.state.writeToStream(mos);
 }
 
 void EqPTAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    juce::MemoryInputStream stream(data, sizeInBytes, true);
+    auto state = juce::ValueTree::readFromStream(stream);
+    if (state.isValid())
+        m_TreeState.replaceState(state);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout EqPTAudioProcessor::createLayout()
@@ -240,11 +276,11 @@ void EqPTAudioProcessor::updateFilters()
     using namespace Params;
     using params = Params::Parameters;
 
-    updateCutFilter(m_LeftChain.get<HPF>(), true);
-    updateCutFilter(m_RightChain.get<HPF>(), true);
-    updateCutFilter(m_LeftChain.get<LPF>(), false);
-    updateCutFilter(m_RightChain.get<LPF>(), false);
-
+    updateCutFilter(m_LeftChain.get<HPF>());
+    updateCutFilter(m_RightChain.get<HPF>());
+    updateCutFilter(m_LeftChain.get<LPF>());
+    updateCutFilter(m_RightChain.get<LPF>());
+    
     updateShelfFilters();
    
     updatePeakFilter(m_LeftChain.get<LMF>(), LMF);
@@ -255,48 +291,38 @@ void EqPTAudioProcessor::updateFilters()
     updatePeakFilter(m_LeftChain.get<HMF>(), HMF);
 }
 
-void EqPTAudioProcessor::updateCutFilter(CutFilter& filter, bool isHPF)
+void EqPTAudioProcessor::updateCutFilter(CutFilter& filter)
 {
     using namespace Params;
     using params = Params::Parameters;
 
     filter.setBypassed<0>(true);
-    filter.setBypassed<0>(true);
     filter.setBypassed<1>(true);
-    filter.setBypassed<1>(true);
-    filter.setBypassed<2>(true);
     filter.setBypassed<2>(true);
 
-    auto slope = m_TreeState.getParameterAsValue(isHPF ? ParameterNames[params::HPF_SLOPE] : ParameterNames[params::LPF_SLOPE]).getValue().toString().substring(0, 2).getIntValue();
-    
-    if (m_TreeState.getRawParameterValue(isHPF ? ParameterNames[params::HPF_BYPASS] : ParameterNames[params::LPF_BYPASS])->load() == false)
+    if (!filter.isBypassed)
     {
-        switch (slope) {
+        switch (filter.slope) {
         case 2: {
-            if (isHPF) {
-                filter.get<2>().coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::HPF_FREQ])->load());
-            }
-            else {
-                filter.get<2>().coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::LPF_FREQ])->load());
-            }
+            filter.get<2>().coefficients =
+                filter.isHPF
+                ? juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), filter.freq)
+                : juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), filter.freq);
             filter.setBypassed<2>(false);
+
         }
         case 1: {
-            if (isHPF) {
-                filter.get<1>().coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::HPF_FREQ])->load());
-            }
-            else {
-                filter.get<1>().coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::LPF_FREQ])->load());
-            }
+            filter.get<1>().coefficients =
+                filter.isHPF
+                ? juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), filter.freq)
+                : juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), filter.freq);
             filter.setBypassed<1>(false);
         }
         case 0: {
-            if (isHPF) {
-                filter.get<0>().coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::HPF_FREQ])->load());
-            }
-            else {
-                filter.get<0>().coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::LPF_FREQ])->load());
-            }
+            filter.get<0>().coefficients =
+                filter.isHPF
+                ? juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), filter.freq)
+                : juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), filter.freq);
             filter.setBypassed<0>(false);
             break;
         }
@@ -306,36 +332,16 @@ void EqPTAudioProcessor::updateCutFilter(CutFilter& filter, bool isHPF)
     }
 }
 
-void EqPTAudioProcessor::updatePeakFilter(Filter& filter, int filterNo)
+void EqPTAudioProcessor::updateCutFilterParams(CutFilter& filter)
+{
+
+}
+
+void EqPTAudioProcessor::updatePeakFilter(PeakFilter& filter, int filterNo)
 {
     using namespace Params;
     using params = Params::Parameters;
     
-    Params::Parameters freq, gain, q, bypass;
-    switch (filterNo) {
-		case LMF: {
-			freq = params::LOW_MID_FREQ;
-			gain = params::LOW_MID_GAIN;
-			q = params::LOW_MID_Q;
-			bypass = params::LOW_MID_BYPASS;
-			break;
-		}
-		case MF: {
-			freq = params::MID_FREQ;
-			gain = params::MID_GAIN;
-			q = params::MID_Q;
-			bypass = params::MID_BYPASS;
-			break;
-		}
-		case HMF: {
-			freq = params::HIGH_MID_FREQ;
-			gain = params::HIGH_MID_GAIN;
-			q = params::HIGH_MID_Q;
-			bypass = params::HIGH_MID_BYPASS;
-			break;
-		}
-    }
-
     if (m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_BYPASS])->load() == false)
     {
 		m_LeftChain.setBypassed<LMF>(false);
@@ -411,9 +417,38 @@ void EqPTAudioProcessor::updateShelfFilters()
     }
 }
 
+
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new EqPTAudioProcessor();
+}
+
+void CutFilter::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    using namespace Params;
+    using params = Params::Parameters;
+    
+    if (parameterID == ParameterNames[params::HPF_FREQ] && isHPF) {
+        freq = newValue;
+    }
+    if (parameterID == ParameterNames[params::HPF_SLOPE] && isHPF) {
+        slope = (CutSlope)newValue;
+    }
+    if (parameterID == ParameterNames[params::HPF_BYPASS] && isHPF) {
+        isBypassed = newValue;
+    }
+
+    if (parameterID == ParameterNames[params::LPF_FREQ] && !isHPF) {
+        freq = newValue;
+    }
+    if (parameterID == ParameterNames[params::LPF_SLOPE] && !isHPF) {
+        slope = (CutSlope)newValue;
+    }
+    if (parameterID == ParameterNames[params::LPF_BYPASS] && !isHPF) {
+        isBypassed = newValue;
+    }
+	//	DBG((isHPF ? "HPF" : "LPF"));
+    //    DBG("Freq: " << freq << ", Slope: " << slope);
 }

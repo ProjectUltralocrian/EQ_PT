@@ -81,8 +81,31 @@ namespace Params {
     };
 }
 
+enum CutSlope {
+    Slope_12 = 0,
+    Slope_24,
+    Slope_36,
+};
 
-class EqPTAudioProcessor  : public juce::AudioProcessor
+struct PeakFilter : public juce::dsp::IIR::Filter<float>
+{
+
+};
+struct CutFilter : public juce::dsp::ProcessorChain<PeakFilter, PeakFilter, PeakFilter>, public juce::AudioProcessorValueTreeState::Listener
+{
+    CutSlope slope{ Slope_24 };
+    bool isHPF;
+    bool isBypassed{ false };
+    float freq;
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+};
+struct ShelfFilter : public juce::dsp::IIR::Filter<float>
+{
+
+};
+
+
+class EqPTAudioProcessor  : public juce::AudioProcessor, juce::ChangeBroadcaster
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -131,19 +154,17 @@ public:
         HPF, LF, LMF, MF, HMF, HF, LPF,
     };
 
+    juce::AudioProcessorValueTreeState m_TreeState;
 private:
     //==============================================================================
 
-    juce::AudioProcessorValueTreeState m_TreeState;
     juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
-    using Filter = juce::dsp::IIR::Filter<float>;
-    //Filter hpf, lf, lmf, mf, hmf, hf, lpf;
-    using CutFilter = juce::dsp::ProcessorChain<Filter, Filter, Filter>;
-    using MonoChain = juce::dsp::ProcessorChain<CutFilter, Filter, Filter, Filter, Filter, Filter, CutFilter>;
+    using MonoChain = juce::dsp::ProcessorChain<CutFilter, PeakFilter, PeakFilter, PeakFilter, PeakFilter, PeakFilter, CutFilter>;
     MonoChain m_LeftChain, m_RightChain;
     void updateFilters();
-    void updateCutFilter(CutFilter& filter, bool isHPF);
-    void updatePeakFilter(Filter& filter, int filterNo);
+    void updateCutFilter(CutFilter& filter);
+    void updateCutFilterParams(CutFilter& filter);
+    void updatePeakFilter(PeakFilter& filter, int filterNo);
     void updateShelfFilters();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (EqPTAudioProcessor)
 };
