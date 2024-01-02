@@ -32,22 +32,58 @@ EqPTAudioProcessor::EqPTAudioProcessor()
    
     for (int i = static_cast<int>(params::HPF_FREQ); i <= static_cast<int>(params::HPF_BYPASS); i++) {
 
-		m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_LeftChain.get<HPF>());
-		m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_RightChain.get<HPF>());
+        for (int c = 0; c < m_MonoChains.size(); ++c) {
+            m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_MonoChains[c].get<HPF>());
+        }
     }
     for (int i = static_cast<int>(params::LPF_FREQ); i <= static_cast<int>(params::LPF_BYPASS); i++) {
 
-		m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_LeftChain.get<LPF>());
-		m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_RightChain.get<LPF>());
+        for (int c = 0; c < m_MonoChains.size(); ++c) {
+            m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_MonoChains[c].get<LPF>());
+        }
     }
-    m_LeftChain.get<HPF>().isHPF = true;
-    m_RightChain.get<HPF>().isHPF = true;
-    m_LeftChain.get<LPF>().isHPF = false;
-    m_RightChain.get<LPF>().isHPF = false;
-    m_LeftChain.get<HPF>().freq = 20.f;
-    m_RightChain.get<HPF>().freq = 20.f;
-    m_LeftChain.get<LPF>().freq = 20000.f;
-    m_RightChain.get<LPF>().freq = 20000.f;
+
+    for (int i = static_cast<int>(params::LOW_MID_FREQ); i <= static_cast<int>(params::HIGH_MID_BYPASS); i++) {
+        for (auto& filter : getAllParametricFilters()) {
+            m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], filter);
+
+        }
+    }
+
+    for (int i = static_cast<int>(params::LOW_SHELF_FREQ); i <= static_cast<int>(params::LOW_SHELF_BYPASS); i++) {
+
+        for (int c = 0; c < m_MonoChains.size(); ++c) {
+            m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_MonoChains[c].get<LF>());
+        }
+    }
+    for (int i = static_cast<int>(params::HIGH_SHELF_FREQ); i <= static_cast<int>(params::HIGH_SHELF_BYPASS); i++) {
+        for (int c = 0; c < m_MonoChains.size(); ++c) {
+            m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], &m_MonoChains[c].get<HF>());
+        }
+    }
+
+    for (int i = 0; i < m_MonoChains.size(); ++i) {
+        m_MonoChains[i].get<HPF>().isHPF = true;
+        m_MonoChains[i].get<LPF>().isHPF = false;
+
+        m_MonoChains[i].get<HPF>().freq = m_TreeState.getRawParameterValue(ParameterNames[params::HPF_FREQ])->load();  //20.f
+        m_MonoChains[i].get<LPF>().freq = m_TreeState.getRawParameterValue(ParameterNames[params::LPF_FREQ])->load();
+        
+        m_MonoChains[i].get<LF>().freq = m_TreeState.getRawParameterValue(ParameterNames[params::LOW_SHELF_FREQ])->load();
+        m_MonoChains[i].get<HF>().freq = m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_SHELF_FREQ])->load();  //20.f
+
+        m_MonoChains[i].get<LMF>().freq = m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_FREQ])->load();
+        m_MonoChains[i].get<MF>().freq = m_TreeState.getRawParameterValue(ParameterNames[params::MID_FREQ])->load();
+        m_MonoChains[i].get<HMF>().freq = m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_MID_FREQ])->load();
+        m_MonoChains[i].get<LMF>().filterType = LMF;
+        m_MonoChains[i].get<MF>().filterType = MF;
+        m_MonoChains[i].get<HMF>().filterType = HMF;
+
+        m_MonoChains[i].get<LF>().isLowShelf = true;
+        m_MonoChains[i].get<HF>().isLowShelf = false;
+      
+    }
+
 }
 
 EqPTAudioProcessor::~EqPTAudioProcessor()
@@ -55,14 +91,31 @@ EqPTAudioProcessor::~EqPTAudioProcessor()
     using namespace Params;
     using params = Params::Parameters;
     for (int i = static_cast<int>(params::HPF_FREQ); i <= static_cast<int>(params::HPF_BYPASS); i++) {
-
-		m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_LeftChain.get<HPF>());
-		m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_RightChain.get<HPF>());
+        for (int c = 0; c < m_MonoChains.size(); ++c) {
+            m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_MonoChains[c].get<HPF>());
+        }
     }
     for (int i = static_cast<int>(params::LPF_FREQ); i <= static_cast<int>(params::LPF_BYPASS); i++) {
+        for (int c = 0; c < m_MonoChains.size(); ++c) {
+            m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_MonoChains[c].get<LPF>());
+        }
+    }
 
-        m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_LeftChain.get<LPF>());
-        m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_RightChain.get<LPF>());
+    for (int i = static_cast<int>(params::LOW_MID_FREQ); i <= static_cast<int>(params::HIGH_MID_BYPASS); i++) {
+        for (auto& filter : getAllParametricFilters()) {
+            m_TreeState.addParameterListener(ParameterNames[static_cast<params>(i)], filter);
+        }
+    }
+    for (int i = static_cast<int>(params::LOW_SHELF_FREQ); i <= static_cast<int>(params::LOW_SHELF_BYPASS); i++) {
+        for (int c = 0; c < m_MonoChains.size(); ++c) {
+            m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_MonoChains[c].get<LF>());
+        }
+
+    }
+    for (int i = static_cast<int>(params::HIGH_SHELF_FREQ); i <= static_cast<int>(params::HIGH_SHELF_BYPASS); i++) {
+        for (int c = 0; c < m_MonoChains.size(); ++c) {
+            m_TreeState.removeParameterListener(ParameterNames[static_cast<params>(i)], &m_MonoChains[c].get<HF>());
+        }
     }
 }
 
@@ -135,8 +188,8 @@ void EqPTAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     spec.numChannels = getNumOutputChannels();
     spec.maximumBlockSize = samplesPerBlock;
     spec.sampleRate = sampleRate;
-    m_LeftChain.prepare(spec);
-    m_RightChain.prepare(spec);
+    m_MonoChains[0].prepare(spec);
+    m_MonoChains[1].prepare(spec);
 }
 
 void EqPTAudioProcessor::releaseResources()
@@ -185,11 +238,10 @@ void EqPTAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     auto leftBlock = block.getNumChannels() > 1 ? block.getSingleChannelBlock(0) : block;
     auto rightBlock = block.getNumChannels() > 1 ? block.getSingleChannelBlock(1) : block;
     
-    
-    updateFilters();
+	updateFilters();
 
-    m_LeftChain.process(juce::dsp::ProcessContextReplacing<float>(leftBlock));
-    m_RightChain.process(juce::dsp::ProcessContextReplacing<float>(rightBlock));
+    m_MonoChains[0].process(juce::dsp::ProcessContextReplacing<float>(leftBlock));
+    m_MonoChains[1].process(juce::dsp::ProcessContextReplacing<float>(rightBlock));
     
     if (m_TreeState.getRawParameterValue(Params::ParameterNames[Params::Parameters::POLARITY_FLIP])->load() == true) {
         buffer.applyGain(-1.f);
@@ -272,34 +324,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout EqPTAudioProcessor::createLa
 
 void EqPTAudioProcessor::updateFilters()
 {
-
-    using namespace Params;
-    using params = Params::Parameters;
-
-    updateCutFilter(m_LeftChain.get<HPF>());
-    updateCutFilter(m_RightChain.get<HPF>());
-    updateCutFilter(m_LeftChain.get<LPF>());
-    updateCutFilter(m_RightChain.get<LPF>());
-    
+    for (int i = 0; i < m_MonoChains.size(); ++i) {
+        updateCutFilter(m_MonoChains[i].get<HPF>());
+        updateCutFilter(m_MonoChains[i].get<LPF>());
+    }
     updateShelfFilters();
-   
-    updatePeakFilter(m_LeftChain.get<LMF>(), LMF);
-    updatePeakFilter(m_LeftChain.get<LMF>(), LMF);
-    updatePeakFilter(m_LeftChain.get<MF>(), MF);
-    updatePeakFilter(m_LeftChain.get<MF>(), MF);
-    updatePeakFilter(m_LeftChain.get<HMF>(), HMF);
-    updatePeakFilter(m_LeftChain.get<HMF>(), HMF);
+    updateParametricFilters();
 }
 
 void EqPTAudioProcessor::updateCutFilter(CutFilter& filter)
 {
-    using namespace Params;
-    using params = Params::Parameters;
-
+    if (!filter.paramsChanged) {
+        return;
+    }
     filter.setBypassed<0>(true);
     filter.setBypassed<1>(true);
     filter.setBypassed<2>(true);
-
+    
     if (!filter.isBypassed)
     {
         switch (filter.slope) {
@@ -330,92 +371,86 @@ void EqPTAudioProcessor::updateCutFilter(CutFilter& filter)
         default: jassert(false);
         }
     }
+    filter.paramsChanged = false;
 }
 
-void EqPTAudioProcessor::updateCutFilterParams(CutFilter& filter)
+juce::Array<PeakFilter*> EqPTAudioProcessor::getAllParametricFilters()
 {
+    juce::Array<PeakFilter*> output;
+    for (int i = 0; i < m_MonoChains.size(); ++i) {
+        output.add(&m_MonoChains[i].get<LMF>());
+        output.add(&m_MonoChains[i].get<MF>());
+        output.add(&m_MonoChains[i].get<HMF>());
+    }
+    return output;
 
 }
 
-void EqPTAudioProcessor::updatePeakFilter(PeakFilter& filter, int filterNo)
+juce::Array<ShelfFilter*> EqPTAudioProcessor::getAllShelfFilters()
 {
-    using namespace Params;
-    using params = Params::Parameters;
-    
-    if (m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_BYPASS])->load() == false)
-    {
-		m_LeftChain.setBypassed<LMF>(false);
-		m_RightChain.setBypassed<LMF>(false);
-		m_LeftChain.get<LMF>().coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_GAIN])->load()));
-		m_RightChain.get<LMF>().coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::LOW_MID_GAIN])->load()));
-    }
-    else
-    {
-		m_LeftChain.setBypassed<LMF>(true);
-		m_RightChain.setBypassed<LMF>(true);
-    }
-    
-    if (m_TreeState.getRawParameterValue(ParameterNames[params::MID_BYPASS])->load() == false)
-    {
-		m_LeftChain.setBypassed<MF>(false);
-		m_RightChain.setBypassed<MF>(false);
-		m_LeftChain.get<MF>().coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::MID_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::MID_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::MID_GAIN])->load()));
-		m_RightChain.get<MF>().coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::MID_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::MID_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::MID_GAIN])->load()));
-    }
-    else
-    {
-		m_LeftChain.setBypassed<MF>(true);
-		m_RightChain.setBypassed<MF>(true);
+    juce::Array<ShelfFilter*> output;
+    for (int i = 0; i < m_MonoChains.size(); ++i) {
+        output.add(&m_MonoChains[i].get<LF>());
+        output.add(&m_MonoChains[i].get<HF>());
     }
 
-
-    if (m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_MID_BYPASS])->load() == false)
-    {
-        m_LeftChain.setBypassed<HMF>(false);
-		m_RightChain.setBypassed<HMF>(false);
-		m_LeftChain.get<HMF>().coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_MID_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_MID_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_MID_GAIN])->load()));
-		m_RightChain.get<HMF>().coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_MID_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_MID_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_MID_GAIN])->load()));
-    }
-    else
-    {
-		m_LeftChain.setBypassed<HMF>(true);
-		m_RightChain.setBypassed<HMF>(true);
-    }
-
+    return output;
 }
+
+
+void EqPTAudioProcessor::updateParametricFilters()
+{
+    auto filters = getAllParametricFilters();
+    for (auto& filter : filters) {
+        if (!filter->paramsChanged) {
+            continue;
+        }
+        switch (filter->filterType) {
+        case LMF: {
+            m_MonoChains[0].setBypassed<LMF>(filter->isBypassed);
+            m_MonoChains[1].setBypassed<LMF>(filter->isBypassed);
+            break;
+        }
+        case MF: {
+            m_MonoChains[0].setBypassed<MF>(filter->isBypassed);
+            m_MonoChains[1].setBypassed<MF>(filter->isBypassed);
+            break;
+        }
+        case HMF: {
+            m_MonoChains[0].setBypassed<HMF>(filter->isBypassed);
+            m_MonoChains[1].setBypassed<HMF>(filter->isBypassed);
+            break;
+        }
+        }
+        filter->coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), filter->freq, filter->q, juce::Decibels::decibelsToGain(filter->gain));
+        filter->paramsChanged = false;
+    }
+}
+
 
 void EqPTAudioProcessor::updateShelfFilters()
 {
-    using namespace Params;
-    using params = Params::Parameters;
-    if (m_TreeState.getRawParameterValue(ParameterNames[params::LOW_SHELF_BYPASS])->load() == false)
-    {
-		m_LeftChain.setBypassed<LF>(false);
-		m_RightChain.setBypassed<LF>(false);
-        
-		m_LeftChain.get<LF>().coefficients = juce::dsp::IIR::Coefficients<float>::makeLowShelf(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::LOW_SHELF_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::LOW_SHELF_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::LOW_SHELF_GAIN])->load()));
-		m_RightChain.get<LF>().coefficients = juce::dsp::IIR::Coefficients<float>::makeLowShelf(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::LOW_SHELF_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::LOW_SHELF_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::LOW_SHELF_GAIN])->load()));
-    }
-    else
-    {
-		m_LeftChain.setBypassed<LF>(true);
-		m_RightChain.setBypassed<LF>(true);
-    }
-
-
-    if (m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_SHELF_BYPASS])->load() == false)
-    {
-		m_LeftChain.setBypassed<HF>(false);
-		m_RightChain.setBypassed<HF>(false);
-		m_LeftChain.get<HF>().coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_SHELF_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_SHELF_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_SHELF_GAIN])->load()));
-		m_RightChain.get<HF>().coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(getSampleRate(), m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_SHELF_FREQ])->load(), m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_SHELF_Q])->load(), juce::Decibels::decibelsToGain(m_TreeState.getRawParameterValue(ParameterNames[params::HIGH_SHELF_GAIN])->load()));
-    }
-    else
-    {
-		m_LeftChain.setBypassed<HF>(true);
-		m_RightChain.setBypassed<HF>(true);
+    auto filters = getAllShelfFilters();
+    for (auto& filter : filters) {
+        if (!filter->paramsChanged) {
+            continue;
+        }
+        if (filter->isLowShelf) {
+            m_MonoChains[0].setBypassed<LF>(filter->isBypassed);
+            m_MonoChains[1].setBypassed<LF>(filter->isBypassed);
+        }
+        else {
+            m_MonoChains[0].setBypassed<HF>(filter->isBypassed);
+            m_MonoChains[1].setBypassed<HF>(filter->isBypassed);
+        }
+        filter->coefficients =
+            filter->isLowShelf
+            ? juce::dsp::IIR::Coefficients<float>::makeLowShelf(getSampleRate(), filter->freq, filter->q, juce::Decibels::decibelsToGain(filter->gain))
+            : juce::dsp::IIR::Coefficients<float>::makeHighShelf(getSampleRate(), filter->freq, filter->q, juce::Decibels::decibelsToGain(filter->gain));
+        filter->paramsChanged = false;
     }
 }
+
 
 
 //==============================================================================
@@ -449,6 +484,84 @@ void CutFilter::parameterChanged(const juce::String& parameterID, float newValue
     if (parameterID == ParameterNames[params::LPF_BYPASS] && !isHPF) {
         isBypassed = newValue;
     }
-	//	DBG((isHPF ? "HPF" : "LPF"));
-    //    DBG("Freq: " << freq << ", Slope: " << slope);
+    paramsChanged = true;
+}
+
+void PeakFilter::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    using namespace Params;
+    using params = Params::Parameters;
+    
+    if (parameterID == ParameterNames[params::LOW_MID_FREQ] && filterType == LMF) {
+        freq = newValue;
+    }
+    if (parameterID == ParameterNames[params::LOW_MID_GAIN] && filterType == LMF) {
+        gain = newValue;
+    }
+    if (parameterID == ParameterNames[params::LOW_MID_Q] && filterType == LMF) {
+        q = newValue;
+    }
+    if (parameterID == ParameterNames[params::LOW_MID_BYPASS] && filterType == LMF) {
+        isBypassed = newValue;
+    }
+    if (parameterID == ParameterNames[params::MID_FREQ] && filterType == MF) {
+        freq = newValue;
+    }
+    if (parameterID == ParameterNames[params::MID_GAIN] && filterType == MF) {
+        gain = newValue;
+    }
+    if (parameterID == ParameterNames[params::MID_Q] && filterType == MF) {
+        q = newValue;
+    }
+    if (parameterID == ParameterNames[params::MID_BYPASS] && filterType == MF) {
+        isBypassed = newValue;
+    }
+    if (parameterID == ParameterNames[params::HIGH_MID_FREQ] && filterType == HMF) {
+        freq = newValue;
+    }
+    if (parameterID == ParameterNames[params::HIGH_MID_GAIN] && filterType == HMF) {
+        gain = newValue;
+    }
+    if (parameterID == ParameterNames[params::HIGH_MID_Q] && filterType == HMF) {
+        q = newValue;
+    }
+    if (parameterID == ParameterNames[params::HIGH_MID_BYPASS] && filterType == HMF) {
+        isBypassed = newValue;
+    }
+    DBG(filterType << ", " << freq << ", " << gain);
+    paramsChanged = true;
+}
+
+void ShelfFilter::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    using namespace Params;
+    using params = Params::Parameters;
+
+    if (parameterID == ParameterNames[params::LOW_SHELF_FREQ] && isLowShelf) {
+        freq = newValue;
+    }
+    if (parameterID == ParameterNames[params::LOW_SHELF_GAIN] && isLowShelf) {
+        gain = newValue;
+    }
+    if (parameterID == ParameterNames[params::LOW_SHELF_Q] && isLowShelf) {
+        q = newValue;
+    }
+    if (parameterID == ParameterNames[params::LOW_SHELF_BYPASS] && isLowShelf) {
+        isBypassed = newValue;
+    }
+
+    if (parameterID == ParameterNames[params::HIGH_SHELF_FREQ] && !isLowShelf) {
+        freq = newValue;
+    }
+    if (parameterID == ParameterNames[params::HIGH_SHELF_GAIN] && !isLowShelf) {
+        gain = newValue;
+    }
+    if (parameterID == ParameterNames[params::HIGH_SHELF_Q] && !isLowShelf) {
+        q = newValue;
+    }
+    if (parameterID == ParameterNames[params::HIGH_SHELF_BYPASS] && !isLowShelf) {
+        isBypassed = newValue;
+    }
+
+    paramsChanged = true;
 }

@@ -87,8 +87,21 @@ enum CutSlope {
     Slope_36,
 };
 
-struct PeakFilter : public juce::dsp::IIR::Filter<float>
+
+enum Filters
 {
+	HPF, LF, LMF, MF, HMF, HF, LPF,
+};
+
+struct PeakFilter : public juce::dsp::IIR::Filter<float>, public juce::AudioProcessorValueTreeState::Listener
+{
+    float freq;
+    float gain{ 1.f };
+    float q{ 1.f };
+    Filters filterType;
+    bool isBypassed{ false };
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    bool paramsChanged{ false };
 
 };
 struct CutFilter : public juce::dsp::ProcessorChain<PeakFilter, PeakFilter, PeakFilter>, public juce::AudioProcessorValueTreeState::Listener
@@ -98,9 +111,17 @@ struct CutFilter : public juce::dsp::ProcessorChain<PeakFilter, PeakFilter, Peak
     bool isBypassed{ false };
     float freq;
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+    bool paramsChanged{ false };
 };
-struct ShelfFilter : public juce::dsp::IIR::Filter<float>
+struct ShelfFilter : public juce::dsp::IIR::Filter<float>, public juce::AudioProcessorValueTreeState::Listener
 {
+    float freq;
+    float gain{ 1.f };
+    float q{ 1.f };
+    bool isLowShelf;
+    bool isBypassed{ false };
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    bool paramsChanged{ false };
 
 };
 
@@ -149,22 +170,21 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 
-    enum Filters
-    {
-        HPF, LF, LMF, MF, HMF, HF, LPF,
-    };
-
     juce::AudioProcessorValueTreeState m_TreeState;
 private:
     //==============================================================================
 
     juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
-    using MonoChain = juce::dsp::ProcessorChain<CutFilter, PeakFilter, PeakFilter, PeakFilter, PeakFilter, PeakFilter, CutFilter>;
-    MonoChain m_LeftChain, m_RightChain;
+    using MonoChain = juce::dsp::ProcessorChain<CutFilter, ShelfFilter, PeakFilter, PeakFilter, PeakFilter, ShelfFilter, CutFilter>;
+    std::array<MonoChain, 2> m_MonoChains;
     void updateFilters();
     void updateCutFilter(CutFilter& filter);
     void updateCutFilterParams(CutFilter& filter);
     void updatePeakFilter(PeakFilter& filter, int filterNo);
     void updateShelfFilters();
+    juce::Array<PeakFilter*> getAllParametricFilters();
+    juce::Array<ShelfFilter*> getAllShelfFilters();
+    juce::Array<PeakFilter*> getAllFiltersFromCutFilter(const CutFilter&);
+    void updateParametricFilters();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (EqPTAudioProcessor)
 };
